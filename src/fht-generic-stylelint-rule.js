@@ -1,6 +1,15 @@
-﻿"use strict";
+﻿//@ts-check
+
+"use strict";
+
+const assert = require('assert');
 
 //all stylelint utils see: https://github.com/stylelint/stylelint/tree/master/lib/utils
+
+/**
+ * @typedef {import("postcss").Root} PostCssRoot
+ * @typedef {import("postcss").Result} PostCssResult
+ */
 
 // Abbreviated example
 const stylelint = require("stylelint");
@@ -12,13 +21,19 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
 });
 
 function ruleFunction(primaryOption) {
-    return function (root, result) {
+    /**
+     * @param {PostCssRoot} root 
+     * @param {PostCssResult} result 
+     */
+    function rule(root, result) {
         const filePath = root.source.input.file;
+        // @ts-ignore
         const sourceCode = root.source.input.css;
+        assert(sourceCode, "sourceCode is falsy");
         const validOptions = stylelint.utils.validateOptions(result, ruleName, {
             actual: primaryOption,
             possible: opt => {
-                if (opt && opt.validator && typeof(opt.validator) === "function") {
+                if (opt && opt.validator && typeof (opt.validator) === "function") {
                     return true;
                 }
                 return false;
@@ -32,7 +47,7 @@ function ruleFunction(primaryOption) {
             try {
                 validator(filePath, sourceCode, rule);
             }
-            catch(err){
+            catch (err) {
                 stylelint.utils.report({
                     message: err.message,
                     node: rule,
@@ -42,6 +57,7 @@ function ruleFunction(primaryOption) {
             }
         });
     }
+    return rule;
 }
 
 ruleFunction.primaryOptionArray = true
