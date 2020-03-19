@@ -1,0 +1,23 @@
+{
+  "name": "fht-stylelint-rules",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "url": "https://github.com/foresightyj/fht-eslint-rules"
+  },
+  "keywords": [],
+  "author": "foresightyj",
+  "license": "MIT",
+  "devDependencies": {
+    "postcss-selector-parser": "^6.0.2",
+    "typescript": "^3.8.3"
+  },
+  "peerDependencies": {
+    "stylelint": ">=13.0.1"
+  },
+  "dependencies": {}
+}
