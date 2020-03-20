@@ -5,8 +5,10 @@
 
 // Abbreviated example
 const path = require('path');
+const assert = require('assert');
 const stylelint = require("stylelint");
 const parser = require('postcss-selector-parser');
+const { makeIgnorer } = require('./utils');
 
 /**
  * @typedef {import("postcss").Root}  Root
@@ -18,7 +20,9 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
     rejected: "Invalid comment"
 });
 
-function ruleFunction(primaryOption) {
+function ruleFunction(primaryOption, secondaryOption) {
+    const ignores = secondaryOption.ignores || [];
+    const ignorer = makeIgnorer([...ignores, "vendor"]);
     return function (_root, result) {
         /** @type {Root} */
         const root = _root;
@@ -32,6 +36,7 @@ function ruleFunction(primaryOption) {
         const stylelintBemDisables = [];
 
         root.walkComments(comment => {
+            // @ts-ignore
             if (comment.raws.inline || comment.inline) {
                 return;
             }
@@ -57,22 +62,18 @@ function ruleFunction(primaryOption) {
             if (tokens[0].startsWith("stylelint-disable") && tokens.length === 1) {
                 report(`使用${tokens[0]}时，请显式指定disable的规则，例如: /* ${tokens[0]} abc, xyz */`)
                 return;
-            }
-            else if (((tokens[0] === "*@define") || (tokens[0] === "*" && tokens[1] == "@define")) && !firstAtDefine) {
+            } else if (((tokens[0] === "*@define") || (tokens[0] === "*" && tokens[1] == "@define")) && !firstAtDefine) {
                 firstAtDefine = comment;
                 hasDefinedBems = true;
-                // if (comment.source.start.line > 1) {
-                //     report(`第一个bem声明，必须放在第一行`);
-                //     return;
-                // }
-                const firstNonCommentNodeInCss = comment.parent.nodes.find(n => n.type !== "comment");
-                if (comment.source.start.line > firstNonCommentNodeInCss.source.start.line) {
+                assert(comment.parent.type === "root", "bem @define comment's parent must be root");
+                const firstRuleInCss = comment.parent.nodes.find(n => n.type === "rule");
+                if(!firstRuleInCss) return;
+                if (comment.source.start.line > firstRuleInCss.source.start.line) {
                     // report(`第一个bem声明，必须放在第${firstNonCommentNodeInCss.source.start.line}行,现在是第${comment.source.start.line}`);
-                    report(`第一个bem声明，必须放在第第一行`);
+                    report(`第一个bem声明，必须放在第一个样式定义之前`);
                     return;
                 }
-            }
-            else {
+            } else {
                 // console.log('tokens', tokens)
             }
         });
@@ -80,13 +81,16 @@ function ruleFunction(primaryOption) {
         const totalClassesInvolved = [];
         const processor = parser(node => {
             node.walkClasses(classNode => {
+                /** @type string */
+                // @ts-ignore
+                /** @type {string} */
                 const className = classNode._value;
+                if (/[#{}$]/.test(className)) return;
                 totalClassesInvolved.push(className);
             })
         });
 
         root.walkRules(rule => {
-            // console.log('rule.selector', rule.selector);
             processor.processSync(rule.selector);
         });
 
