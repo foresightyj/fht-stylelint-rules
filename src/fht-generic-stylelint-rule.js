@@ -28,7 +28,7 @@ function ruleFunction(primaryOption) {
     function rule(root, result) {
         const filePath = root.source.input.file;
         const sourceCode = root.source.input.css;
-        assert(sourceCode, "sourceCode is falsy");
+        assert(typeof(sourceCode) === "string", "sourceCode is not string");
         const validOptions = stylelint.utils.validateOptions(result, ruleName, {
             actual: primaryOption,
             possible: opt => {
