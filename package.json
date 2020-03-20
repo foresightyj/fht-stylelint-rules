@@ -1,6 +1,6 @@
 {
   "name": "fht-stylelint-rules",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "",
   "main": "src/index.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "postcss": "^7.0.27",
     "postcss-selector-parser": "^6.0.2",
     "stylelint": "^13.2.1",
+    "stylelint-test-rule-tape": "^0.2.0",
     "typescript": "^3.8.3"
   },
   "peerDependencies": {
