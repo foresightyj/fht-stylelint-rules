@@ -133,7 +133,7 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
                     const found = possiblePaths.some(cachedFileExist);
                     if (!found) {
                         stylelint.utils.report({
-                            message: `"${moduleImport}" does not exist on disk`,
+                            message: `"${moduleImport}" does not exist in disk`,
                             node: rule,
                             result,
                             ruleName,
@@ -142,9 +142,52 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
                 }
             }
         });
-        // root.walkDecls(decl => {
-        //     console.log(`${decl.prop} = ${decl.value}`);
-        // });
+        root.walkDecls(decl => {
+            if (decl.value && decl.value.includes("url")) {
+                const found = /\burl\s*\(\s*['"]?([^'"]+?)['"]?\s*\)/.exec(
+                    decl.value,
+                );
+                assert(found, "failed to parse url in " + decl.value);
+                const url = found[1];
+                const isRelative = url.startsWith(".");
+                /** @type {string} */
+                let assetPath;
+                if (isRelative) {
+                    assetPath = path.join(path.dirname(filePath), url);
+                } else {
+                    if (!url.startsWith("~")) {
+                        stylelint.utils.report({
+                            message: "absolute import must start with ~",
+                            node: decl,
+                            result,
+                            ruleName,
+                        });
+                        return;
+                    } else {
+                        const urlWithoutTilde = url.substr(1);
+                        assetPath = mapAlias(urlWithoutTilde);
+                    }
+                }
+                if (!assetPath) {
+                    stylelint.utils.report({
+                        message: "I cannot handle path: " + url,
+                        node: decl,
+                        result,
+                        ruleName,
+                    });
+                } else {
+                    const found = cachedFileExist(assetPath);
+                    if (!found) {
+                        stylelint.utils.report({
+                            message: `${url} does not exist in disk`,
+                            node: decl,
+                            result,
+                            ruleName,
+                        });
+                    }
+                }
+            }
+        });
     }
     return rule;
 }
