@@ -117,7 +117,6 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
                 }
 
                 if (!modulePath) {
-                    console.log(moduleImport, mapAlias(moduleImport));
                     stylelint.utils.report({
                         message: "impossible",
                         node: rule,
