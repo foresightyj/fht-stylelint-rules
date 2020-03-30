@@ -14,12 +14,33 @@ const fs = require("fs");
 const assert = require("assert");
 const path = require("path");
 const stylelint = require("stylelint");
+const LRU = require("lru-cache");
 
 const ruleName = "fht-rules/stylelint-plugin-import";
 
 const messages = stylelint.utils.ruleMessages(ruleName, {
     expected: "Please use variables defined in variables/_color.scss",
 });
+
+const lru = new LRU({
+    max: 1000,
+    length: (v, k) => k.length + 10,
+    maxAge: 20 * 1000,
+});
+
+/**
+ * @param {string} path
+ * @returns boolean
+ */
+function cachedFileExist(path) {
+    const v = lru.get(path);
+    if (typeof v !== "undefined") {
+        return v;
+    }
+    const exists = fs.existsSync(path);
+    lru.set(path, exists);
+    return exists;
+}
 
 function ruleFunction(primaryOption, secondaryOptionObject) {
     /** @type {string} */
@@ -61,14 +82,17 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
     /**
      * @param {string} modulePath
      */
-    function fixExtension(modulePath) {
+    function inferExtension(modulePath) {
         const hasExt = path.extname(modulePath) === ".scss";
         if (hasExt) {
             return modulePath;
         } else {
             const dirname = path.dirname(modulePath);
             const filename = path.basename(modulePath);
-            return path.join(dirname, `_${filename}.scss`);
+            return [
+                path.join(dirname, `_${filename}.scss`),
+                path.join(dirname, `${filename}.scss`),
+            ];
         }
     }
     /**
@@ -81,7 +105,7 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
             if (rule.name === "import") {
                 const moduleImport = JSON.parse(rule.params);
                 const isRelative = moduleImport.startsWith(".");
-                /** @type {string} */
+                /** @type {string| string[]} */
                 let modulePath;
                 if (isRelative) {
                     modulePath = path.join(
@@ -102,10 +126,14 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
                     });
                     return;
                 } else {
-                    modulePath = fixExtension(modulePath);
-                    if (!fs.existsSync(modulePath)) {
+                    modulePath = inferExtension(modulePath);
+                    const possiblePaths = Array.isArray(modulePath)
+                        ? modulePath
+                        : [modulePath];
+                    const found = possiblePaths.some(cachedFileExist);
+                    if (!found) {
                         stylelint.utils.report({
-                            message: "Imported module does not exist",
+                            message: `"${moduleImport}" does not exist on disk`,
                             node: rule,
                             result,
                             ruleName,

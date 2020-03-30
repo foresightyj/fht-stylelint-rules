@@ -1,4 +1,4 @@
-﻿//@ts-check
+//@ts-check
 "use strict";
 
 //all stylelint utils see: https://github.com/stylelint/stylelint/tree/master/lib/utils
