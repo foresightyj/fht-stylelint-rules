@@ -15,17 +15,19 @@ const assert = require("assert");
 const path = require("path");
 const stylelint = require("stylelint");
 const LRU = require("lru-cache");
+const util = require("util");
 
 const ruleName = "fht-rules/stylelint-plugin-import";
 
 const messages = stylelint.utils.ruleMessages(ruleName, {
-    expected: "Please use variables defined in variables/_color.scss",
+  expected: "Please use variables defined in variables/_color.scss",
 });
 
 const lru = new LRU({
-    max: 1000,
-    length: (v, k) => k.length + 10,
-    maxAge: 20 * 1000,
+  max: 1000,
+  // @ts-ignore
+  length: (v, k) => k.length + 10,
+  maxAge: 20 * 1000,
 });
 
 /**
@@ -33,166 +35,193 @@ const lru = new LRU({
  * @returns boolean
  */
 function cachedFileExist(path) {
-    const v = lru.get(path);
-    if (typeof v !== "undefined") {
-        return v;
-    }
-    const exists = fs.existsSync(path);
-    lru.set(path, exists);
-    return exists;
+  const v = lru.get(path);
+  if (typeof v !== "undefined") {
+    return v;
+  }
+  const exists = fs.existsSync(path);
+  lru.set(path, exists);
+  return exists;
 }
 
+// @ts-ignore
 function ruleFunction(primaryOption, secondaryOptionObject) {
-    /** @type {string} */
-    const projectRoot = secondaryOptionObject.projectRoot;
-    assert(projectRoot, "projectRoot is a required option");
-    assert(typeof projectRoot === "string", "projectRoot is must be string");
-    assert(
-        path.isAbsolute(projectRoot),
-        `projectRoot ${projectRoot} is not absolute path`,
-    );
-    assert(fs.existsSync(projectRoot), projectRoot + " does not exist");
-    /** @type {{[k:string]:string}} */
-    const webpackAlias = secondaryOptionObject.webpackAlias || {};
+  /** @type {string} */
+  const projectRoot = secondaryOptionObject.projectRoot;
+  // @ts-ignore
+  assert(projectRoot, "projectRoot is a required option");
+  // @ts-ignore
+  assert(typeof projectRoot === "string", "projectRoot is must be string");
+  // @ts-ignore
+  assert(
+    path.isAbsolute(projectRoot),
+    `projectRoot ${projectRoot} is not absolute path`
+  );
+  // @ts-ignore
+  assert(fs.existsSync(projectRoot), projectRoot + " does not exist");
+  /** @type {{[k:string]:string}} */
+  const webpackAlias = secondaryOptionObject.webpackAlias || {};
+  for (const aliasKey of Object.keys(webpackAlias)) {
+    // @ts-ignore
+    assert(!aliasKey.endsWith("/"), "webpack alias should not end with /");
+  }
+  /**
+   * @param {string} moduleImport
+   * @return {string|undefined}
+   */
+  function mapAlias(moduleImport) {
+    if (moduleImport.startsWith("~")) {
+      moduleImport = moduleImport.substr(1);
+    }
     for (const aliasKey of Object.keys(webpackAlias)) {
-        assert(!aliasKey.endsWith("/"), "webpack alias should not end with /");
-    }
-    /**
-     * @param {string} moduleImport
-     * @return {string|undefined}
-     */
-    function mapAlias(moduleImport) {
-        for (const aliasKey of Object.keys(webpackAlias)) {
-            const aliasPrefix = aliasKey + "/";
-            if (moduleImport.startsWith(aliasPrefix)) {
-                const underlyingPath = path.join(
-                    webpackAlias[aliasKey],
-                    moduleImport.substr(aliasPrefix.length),
-                );
-                if (!path.isAbsolute(underlyingPath)) {
-                    return path.join(projectRoot, underlyingPath);
-                } else {
-                    return underlyingPath;
-                }
-            }
-        }
-        return;
-    }
-
-    /**
-     * @param {string} modulePath
-     */
-    function inferExtension(modulePath) {
-        const hasExt = path.extname(modulePath) === ".scss";
-        if (hasExt) {
-            return modulePath;
+      const aliasPrefix = aliasKey + "/";
+      if (moduleImport.startsWith(aliasPrefix)) {
+        const underlyingPath = path.join(
+          webpackAlias[aliasKey],
+          moduleImport.substr(aliasPrefix.length)
+        );
+        if (!path.isAbsolute(underlyingPath)) {
+          return path.join(projectRoot, underlyingPath);
         } else {
-            const dirname = path.dirname(modulePath);
-            const filename = path.basename(modulePath);
-            return [
-                path.join(dirname, `_${filename}.scss`),
-                path.join(dirname, `${filename}.scss`),
-            ];
+          return underlyingPath;
         }
+      }
     }
-    /**
-     * @param {PostCssRoot} root
-     * @param {PostCssResult} result
-     */
-    function rule(root, result) {
-        const filePath = root.source.input.file;
-        root.walkAtRules(rule => {
-            if (rule.name === "import") {
-                const moduleImport = JSON.parse(rule.params);
-                const isRelative = moduleImport.startsWith(".");
-                /** @type {string| string[]} */
-                let modulePath;
-                if (isRelative) {
-                    modulePath = path.join(
-                        path.dirname(filePath),
-                        moduleImport,
-                    );
-                } else {
-                    modulePath = mapAlias(moduleImport);
-                }
+    return;
+  }
 
-                if (!modulePath) {
-                    stylelint.utils.report({
-                        message: "impossible",
-                        node: rule,
-                        result,
-                        ruleName,
-                    });
-                    return;
-                } else {
-                    modulePath = inferExtension(modulePath);
-                    const possiblePaths = Array.isArray(modulePath)
-                        ? modulePath
-                        : [modulePath];
-                    const found = possiblePaths.some(cachedFileExist);
-                    if (!found) {
-                        stylelint.utils.report({
-                            message: `"${moduleImport}" does not exist in disk`,
-                            node: rule,
-                            result,
-                            ruleName,
-                        });
-                    }
-                }
-            }
-        });
-        root.walkDecls(decl => {
-            if (decl.value && decl.value.includes("url")) {
-                const found = /\burl\s*\(\s*['"]?([^'"]+?)['"]?\s*\)/.exec(
-                    decl.value,
-                );
-                assert(found, "failed to parse url in " + decl.value);
-                const url = found[1];
-                const isRelative = url.startsWith(".");
-                /** @type {string} */
-                let assetPath;
-                if (isRelative) {
-                    assetPath = path.join(path.dirname(filePath), url);
-                } else {
-                    if (!url.startsWith("~")) {
-                        stylelint.utils.report({
-                            message: "absolute import must start with ~",
-                            node: decl,
-                            result,
-                            ruleName,
-                        });
-                        return;
-                    } else {
-                        const urlWithoutTilde = url.substr(1);
-                        assetPath = mapAlias(urlWithoutTilde);
-                    }
-                }
-                if (!assetPath) {
-                    stylelint.utils.report({
-                        message: "I cannot handle path: " + url,
-                        node: decl,
-                        result,
-                        ruleName,
-                    });
-                } else {
-                    const found = cachedFileExist(assetPath);
-                    if (!found) {
-                        stylelint.utils.report({
-                            message: `${url} does not exist in disk`,
-                            node: decl,
-                            result,
-                            ruleName,
-                        });
-                    }
-                }
-            }
-        });
+  /**
+   * @param {string} modulePath
+   */
+  function inferExtension(modulePath) {
+    const hasExt = path.extname(modulePath) === ".scss";
+    if (hasExt) {
+      return modulePath;
+    } else {
+      const dirname = path.dirname(modulePath);
+      const filename = path.basename(modulePath);
+      return [
+        path.join(dirname, `_${filename}.scss`),
+        path.join(dirname, `${filename}.scss`),
+      ];
     }
-    return rule;
+  }
+  /**
+   * @param {PostCssRoot} root
+   * @param {PostCssResult} result
+   */
+  function rule(root, result) {
+    const filePath = root.source.input.file;
+    root.walkAtRules((rule) => {
+      if (rule.name === "import") {
+        try {
+          const moduleImport = JSON.parse(rule.params);
+          const isRelative = moduleImport.startsWith(".");
+          /** @type {string| string[]} */
+          let modulePath;
+          if (isRelative) {
+            modulePath = path.join(path.dirname(filePath), moduleImport);
+          } else {
+            modulePath = mapAlias(moduleImport);
+          }
+
+          if (!modulePath) {
+            stylelint.utils.report({
+              message: "impossible:" + moduleImport,
+              // @ts-ignore
+              node: rule,
+              // @ts-ignore
+              result,
+              ruleName,
+            });
+            return;
+          } else {
+            modulePath = inferExtension(modulePath);
+            const possiblePaths = Array.isArray(modulePath)
+              ? modulePath
+              : [modulePath];
+            const found = possiblePaths.some(cachedFileExist);
+            if (!found) {
+              stylelint.utils.report({
+                message: `"${moduleImport}" does not exist in disk`,
+                // @ts-ignore
+                node: rule,
+                // @ts-ignore
+                result,
+                ruleName,
+              });
+            }
+          }
+        } catch (err) {
+          stylelint.utils.report({
+            message: "Oops:" + err,
+            // @ts-ignore
+            node: rule,
+            // @ts-ignore
+            result,
+            ruleName,
+          });
+        }
+      }
+    });
+    root.walkDecls((decl) => {
+      if (decl.value && decl.value.includes("url")) {
+        const found = /\burl\s*\(\s*['"]?([^'"]+?)['"]?\s*\)/.exec(decl.value);
+        // @ts-ignore
+        assert(found, "failed to parse url in " + decl.value);
+        const url = found[1];
+        const isRelative = url.startsWith(".");
+        /** @type {string} */
+        let assetPath;
+        if (isRelative) {
+          assetPath = path.join(path.dirname(filePath), url);
+        } else {
+          if (!url.startsWith("~")) {
+            stylelint.utils.report({
+              message: "absolute import must start with ~",
+              // @ts-ignore
+              node: decl,
+              // @ts-ignore
+              result,
+              ruleName,
+            });
+            return;
+          } else {
+            const urlWithoutTilde = url.substr(1);
+            assetPath = mapAlias(urlWithoutTilde);
+          }
+        }
+        if (!assetPath) {
+          stylelint.utils.report({
+            message: "I cannot handle path: " + url,
+            // @ts-ignore
+            node: decl,
+            // @ts-ignore
+            result,
+            ruleName,
+          });
+        } else {
+          const found = cachedFileExist(assetPath);
+          if (!found) {
+            stylelint.utils.report({
+              message: `${url} does not exist in disk`,
+              // @ts-ignore
+              node: decl,
+              // @ts-ignore
+              result,
+              ruleName,
+            });
+          }
+        }
+      }
+    });
+  }
+  return rule;
 }
 
 ruleFunction.primaryOptionArray = true;
 
+// @ts-ignore
 module.exports = stylelint.createPlugin(ruleName, ruleFunction);
 
 //for testing, use https://github.com/simonsmith/stylelint-selector-bem-pattern/blob/master/test/index.js

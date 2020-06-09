@@ -1,6 +1,6 @@
 {
     "name": "fht-stylelint-rules",
-    "version": "0.0.17",
+    "version": "0.0.19",
     "description": "",
     "main": "src/index.js",
     "scripts": {
@@ -15,12 +15,11 @@
     "devDependencies": {
         "postcss": "^7.0.27",
         "postcss-selector-parser": "^6.0.2",
-        "stylelint": "^13.2.1",
         "stylelint-test-rule-tape": "^0.2.0",
-        "typescript": "^3.8.3"
+        "lru-cache": "^5.1.1",
+        "typescript": "^3.9.5"
     },
     "peerDependencies": {
-        "lru-cache": "^5.1.1",
-        "stylelint": ">=13.0.1"
+        "stylelint": "^13.2.1"
     }
 }
