@@ -20,7 +20,7 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
   rejected: "Invalid comment",
 });
 
-function ruleFunction(primaryOption) {
+function ruleFunction(primaryOption, secondaryOptionObject) {
   /**
    * @param {PostCssRoot} root
    * @param {PostCssResult} result
@@ -30,18 +30,7 @@ function ruleFunction(primaryOption) {
     const sourceCode = root.source.input.css;
     // @ts-ignore
     assert(typeof sourceCode === "string", "sourceCode is not string");
-    const validOptions = stylelint.utils.validateOptions(result, ruleName, {
-      actual: primaryOption,
-      possible: (opt) => {
-        if (opt && opt.validator && typeof opt.validator === "function") {
-          return true;
-        }
-        return false;
-      },
-    });
-    if (!validOptions) return;
-
-    const validators = primaryOption.validators;
+    const validators = secondaryOptionObject.validators;
     // @ts-ignore
     assert(validators, "validators options is not defined");
 
