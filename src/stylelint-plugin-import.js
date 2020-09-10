@@ -127,7 +127,9 @@ function ruleFunction(primaryOption, secondaryOptionObject) {
 
           if (!modulePath) {
             stylelint.utils.report({
-              message: "impossible:" + moduleImport,
+              message:
+                "@yuanjian Impossible! Failed to parse modulePath from: " +
+                moduleImport,
               // @ts-ignore
               node: rule,
               // @ts-ignore
