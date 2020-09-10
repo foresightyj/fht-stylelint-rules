@@ -14,7 +14,7 @@ const assert = require("assert");
 // Abbreviated example
 const stylelint = require("stylelint");
 
-const ruleName = "fht-rules/fht-generic-stylelint-rule";
+const ruleName = "fht-rules/fht-generic-stylelint-at-rule";
 
 const messages = stylelint.utils.ruleMessages(ruleName, {
   rejected: "Invalid comment",
