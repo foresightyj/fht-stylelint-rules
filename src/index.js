@@ -6,5 +6,6 @@ module.exports = [
     require("./color-requires-variable-value.js"),
     require("./fht-stylelint-comment-rule.js"),
     require("./fht-generic-stylelint-rule.js"),
+    require("./fht-generic-stylelint-at-rule.js"),
     require("./stylelint-plugin-import"),
 ];
